@@ -1,0 +1,3 @@
+# Dépendances du moteur de qualité. Épingler les versions en Phase 3.
+pydantic
+psycopg[binary]

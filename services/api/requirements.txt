@@ -1,0 +1,5 @@
+# Dépendances de l'API. Épingler les versions en Phase 4.
+fastapi
+uvicorn[standard]
+pydantic
+psycopg[binary]

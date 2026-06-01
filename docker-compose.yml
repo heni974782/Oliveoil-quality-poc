@@ -1,0 +1,92 @@
+# Orchestration du POC — monitoring qualité huile d'olive.
+#
+# Phase 0 : seuls le broker MQTT et la base de données sont actifs.
+# Les services applicatifs sont déclarés en commentaire et activés au fil
+# des phases (voir docs/roadmap.md). Une alternative plus propre, à envisager,
+# est l'usage de "profiles" Compose pour activer les services par phase.
+
+name: oliveoil-quality-poc
+
+services:
+
+  # --- Broker MQTT (actif dès la Phase 0) ---
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: oliveoil-mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"            # MQTT — exposé en local uniquement pour le POC
+    volumes:
+      - ./broker/mosquitto/config:/mosquitto/config:ro
+      - mosquitto-data:/mosquitto/data
+    networks:
+      - iot-net
+
+  # --- Base time-series (active dès la Phase 0) ---
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: oliveoil-timescaledb
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+      - timescaledb-data:/var/lib/postgresql/data
+    networks:
+      - backend-net
+
+  # --- Phase 1 : simulateur de devices ---
+  device-simulator:
+    build: ./services/device-simulator
+    container_name: oliveoil-device-simulator
+    env_file: .env
+    depends_on:
+      - mosquitto
+    networks:
+      - iot-net
+
+  # --- Phase 2 : service d'ingestion ---
+  # Seul service à cheval sur les deux réseaux : point de passage contrôlé
+  # entre la zone "terrain" (iot-net) et la zone back-end (backend-net).
+  ingestion:
+    build: ./services/ingestion
+    container_name: oliveoil-ingestion
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      - mosquitto
+      - timescaledb
+    networks:
+      - iot-net
+      - backend-net
+
+  # --- Phase 3 : moteur de qualité ---
+  # quality-engine:
+  #   build: ./services/quality-engine
+  #   container_name: oliveoil-quality-engine
+  #   env_file: .env
+  #   depends_on: [timescaledb]
+  #   networks: [backend-net]
+
+  # --- Phase 4 : API ---
+  # api:
+  #   build: ./services/api
+  #   container_name: oliveoil-api
+  #   env_file: .env
+  #   depends_on: [timescaledb]
+  #   ports: ["8000:8000"]
+  #   networks: [backend-net]
+
+networks:
+  iot-net:
+    driver: bridge
+  backend-net:
+    driver: bridge
+
+volumes:
+  mosquitto-data:
+  timescaledb-data:

@@ -1,0 +1,25 @@
+# Secrets & environnement
+.env
+*.local
+admin.txt
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Node / frontend
+node_modules/
+dist/
+build/
+
+# Mosquitto runtime (le fichier passwd est un secret)
+broker/mosquitto/config/passwd
+broker/mosquitto/data/
+broker/mosquitto/log/
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
