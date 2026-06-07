@@ -1,13 +1,16 @@
+import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useConsignmentDetail } from './hooks'
 import { useAlerts } from '../alerts/hooks'
 import TelemetryChart from './TelemetryChart'
 import QualityChart from './QualityChart'
+import TimeWindowSelector from './TimeWindowSelector'
 import AlertsTable from '../alerts/AlertsTable'
 
 export default function ConsignmentDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const { telemetry, quality } = useConsignmentDetail(id ?? '')
+  const [hours, setHours] = useState(24)
+  const { telemetry, quality } = useConsignmentDetail(id ?? '', hours)
   const alerts = useAlerts(id)
 
   const latestScore = quality.data?.at(-1)?.quality_score ?? null
@@ -32,6 +35,10 @@ export default function ConsignmentDetailPage() {
             {latestScore.toFixed(1)}<span className="text-slate-500 text-base ml-1">/100</span>
           </span>
         )}
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-xs text-slate-500 uppercase tracking-wide">Fenêtre</span>
+          <TimeWindowSelector value={hours} onChange={setHours} />
+        </div>
       </div>
 
       {/* Quality score over time */}

@@ -193,19 +193,42 @@ Browser :3000 → Nginx → /api/* → FastAPI :8000 → TimescaleDB
 |---------|--------|------|-------------|
 | GET | `/health` | Non | Health check |
 | GET | `/consignments/` | Bearer | Liste + résumé (score, métriques, alertes 24h) |
-| GET | `/consignments/{id}/telemetry` | Bearer | Historique télémétrie (ASC, limit=200) |
-| GET | `/consignments/{id}/quality` | Bearer | Historique scores qualité (ASC, limit=200) |
+| GET | `/consignments/{id}/telemetry` | Bearer | Télémétrie downsamplée (`hours=1..720`, `time_bucket` TimescaleDB) |
+| GET | `/consignments/{id}/quality` | Bearer | Scores downsamplés (`hours=1..720`, `time_bucket` TimescaleDB) |
 | GET | `/alerts/` | Bearer | Alertes récentes (filtre consignment_id, limit=50) |
 | WS | `/ws/live?token=` | Query param | Push toutes les 10 s |
+
+### Sélecteur de fenêtre temporelle + downsampling
+
+La page détail expose un sélecteur `1h / 6h / 24h / 7j` qui pilote les graphes
+télémétrie **et** score qualité. Le paramètre `hours` est transmis à l'API.
+
+Pour éviter de renvoyer des dizaines de milliers de points (24 h ≈ 8 600 points
+bruts, 7 j ≈ 60 000), l'API **downsample** via `time_bucket()` de TimescaleDB.
+La taille du bucket s'adapte à la fenêtre — résultat : ~100-200 points quelle
+que soit la durée, graphes lisibles, payload léger.
+
+| Fenêtre (`hours`) | Bucket |
+|-------------------|--------|
+| ≤ 1 h  | 1 min |
+| ≤ 6 h  | 5 min |
+| ≤ 24 h | 15 min |
+| ≤ 72 h | 30 min |
+| > 72 h | 1 h |
+
+Choix structurant : le downsampling exploite directement la base time-series —
+ce n'est pas un contournement applicatif. Argument défendable côté client.
 
 ### Feature-based architecture React
 
 ```
 src/
-  shared/           # types, apiClient, useLiveData, Navbar, StatusBadge
+  shared/           # types, apiClient, auth, useLiveData, Navbar, StatusBadge
   features/
+    auth/           # LoginPage
     consignments/   # api, hooks, ConsignmentsPage, ConsignmentCard,
-                    # ConsignmentDetailPage, TelemetryChart, QualityChart
+                    # ConsignmentDetailPage, TelemetryChart, QualityChart,
+                    # TimeWindowSelector
     alerts/         # api, hooks, AlertsTable
 ```
 

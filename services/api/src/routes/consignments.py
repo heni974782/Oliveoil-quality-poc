@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from psycopg import AsyncConnection
 from psycopg.rows import dict_row
 
@@ -49,55 +49,72 @@ async def list_consignments(conn: AsyncConnection = Depends(get_db)):
         return [ConsignmentSummary(**row) for row in await cur.fetchall()]
 
 
+def _bucket_for_hours(hours: int) -> str:
+    """Pick a downsampling bucket so any window yields ~100-200 points.
+
+    Keeps charts readable and the payload small regardless of the time span,
+    leveraging TimescaleDB's time_bucket() — the reason the DB was chosen.
+    """
+    if hours <= 1:
+        return "1 minute"
+    if hours <= 6:
+        return "5 minutes"
+    if hours <= 24:
+        return "15 minutes"
+    if hours <= 72:
+        return "30 minutes"
+    return "1 hour"
+
+
 @router.get("/{consignment_id}/telemetry", response_model=list[TelemetryPoint])
 async def get_telemetry(
     consignment_id: str,
-    limit: int = Query(default=200, ge=1, le=1000),
+    hours: int = Query(default=24, ge=1, le=720),
     conn: AsyncConnection = Depends(get_db),
 ):
+    bucket = _bucket_for_hours(hours)
     async with conn.cursor(row_factory=dict_row) as cur:
+        # Bucketed averages over the rolling window. event is dropped — an
+        # aggregate has no single event marker.
         await cur.execute(
             """
-            SELECT time, temperature_c, light_lux, humidity_pct, event
-            FROM (
-                SELECT time, temperature_c, light_lux, humidity_pct, event
-                FROM telemetry
-                WHERE consignment_id = %s
-                ORDER BY time DESC
-                LIMIT %s
-            ) sub
-            ORDER BY time ASC;
+            SELECT time_bucket(%s::interval, time) AS time,
+                   avg(temperature_c) AS temperature_c,
+                   avg(light_lux)     AS light_lux,
+                   avg(humidity_pct)  AS humidity_pct
+            FROM telemetry
+            WHERE consignment_id = %s
+              AND time >= now() - make_interval(hours => %s)
+            GROUP BY 1
+            ORDER BY 1 ASC;
             """,
-            (consignment_id, limit),
+            (bucket, consignment_id, hours),
         )
         rows = await cur.fetchall()
-    if not rows:
-        raise HTTPException(status_code=404, detail=f"Consignment '{consignment_id}' not found")
-    return [TelemetryPoint(**row) for row in rows]
+    return [TelemetryPoint(**row, event=None) for row in rows]
 
 
 @router.get("/{consignment_id}/quality", response_model=list[QualityPoint])
 async def get_quality(
     consignment_id: str,
-    limit: int = Query(default=200, ge=1, le=1000),
+    hours: int = Query(default=24, ge=1, le=720),
     conn: AsyncConnection = Depends(get_db),
 ):
+    bucket = _bucket_for_hours(hours)
     async with conn.cursor(row_factory=dict_row) as cur:
         await cur.execute(
             """
-            SELECT time, quality_score, degree_hours, lux_hours
-            FROM (
-                SELECT time, quality_score, degree_hours, lux_hours
-                FROM quality_index
-                WHERE consignment_id = %s
-                ORDER BY time DESC
-                LIMIT %s
-            ) sub
-            ORDER BY time ASC;
+            SELECT time_bucket(%s::interval, time) AS time,
+                   avg(quality_score) AS quality_score,
+                   avg(degree_hours)  AS degree_hours,
+                   avg(lux_hours)     AS lux_hours
+            FROM quality_index
+            WHERE consignment_id = %s
+              AND time >= now() - make_interval(hours => %s)
+            GROUP BY 1
+            ORDER BY 1 ASC;
             """,
-            (consignment_id, limit),
+            (bucket, consignment_id, hours),
         )
         rows = await cur.fetchall()
-    if not rows:
-        raise HTTPException(status_code=404, detail=f"Consignment '{consignment_id}' not found")
     return [QualityPoint(**row) for row in rows]
