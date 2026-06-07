@@ -119,3 +119,4 @@ Vérifier la « définition de terminé » avant d'avancer. Détail dans
 | 2026-06-03 | Phase 5 livrée : ACL MQTT activée (moindre privilège), revue sécurité complète dans `docs/security-review.md`. POC complet — toutes phases terminées. |
 | 2026-06-07 | Fenêtre glissante `QUALITY_WINDOW_DAYS=1` (défaut) : moteur calcule sur les dernières 24h au lieu de l'historique complet. Évite le score figé à 0 sur démo longue durée. |
 | 2026-06-07 | Recalibration poids lumineux `QUALITY_LIGHT_WEIGHT=0.005` (était 0.1) : un incident `sun_exposure` ne détruit plus le score instantanément. Probabilité incidents simulateur réduite à 0.5%. |
+| 2026-06-07 | Injection manuelle (`/inject`) : service `manual-injector` à cheval iot/backend, publie sur MQTT (pas d'écriture directe en base — respect du contrat device-agnostique). 2ᵉ pont après l'ingestion, assumé comme affordance de démo. Scénarios horodatés dans le passé pour faire bouger le score cumulé. |

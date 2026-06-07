@@ -88,6 +88,28 @@ services:
     networks:
       - backend-net
 
+  # --- Injecteur manuel (démo/apprentissage) ---
+  # Publie de la télémétrie saisie à la main sur MQTT — ne touche JAMAIS la base
+  # directement. L'ingestion valide comme pour tout autre émetteur (contrat
+  # device-agnostique). 2e composant à cheval sur les deux réseaux, après
+  # l'ingestion : affordance de démo, à restreindre/retirer en production.
+  manual-injector:
+    build: ./services/manual-injector
+    container_name: oliveoil-manual-injector
+    restart: unless-stopped
+    environment:
+      MQTT_HOST: mosquitto
+      MQTT_PORT: 1883
+      INJECTOR_MQTT_USERNAME: ${SIMULATOR_MQTT_USERNAME}
+      INJECTOR_MQTT_PASSWORD: ${SIMULATOR_MQTT_PASSWORD}
+      INJECTOR_SITE_ID: ${SIMULATOR_SITE_ID}
+      API_AUTH_TOKEN: ${API_AUTH_TOKEN}
+    depends_on:
+      - mosquitto
+    networks:
+      - iot-net
+      - backend-net
+
   # --- Phase 4 : Dashboard React (Nginx + proxy vers api) ---
   dashboard:
     build:
@@ -98,6 +120,7 @@ services:
       - "3000:80"
     depends_on:
       - api
+      - manual-injector
     networks:
       - backend-net
 

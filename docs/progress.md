@@ -219,6 +219,35 @@ que soit la durée, graphes lisibles, payload léger.
 Choix structurant : le downsampling exploite directement la base time-series —
 ce n'est pas un contournement applicatif. Argument défendable côté client.
 
+### Injection manuelle (démo / apprentissage)
+
+Page `/inject` du dashboard permettant à un opérateur de saisir de la
+télémétrie à la main pour observer la réaction du modèle.
+
+**Architecture — respect du contrat device-agnostique :** la saisie ne touche
+**jamais** la base directement. Un service dédié `manual-injector` publie le
+payload JSON sur MQTT → l'ingestion valide (Pydantic) → écrit en base. Une
+injection manuelle = juste un autre émetteur sur le contrat. C'est exactement
+ce que le contrat device-agnostique permet.
+
+```
+Dashboard /inject → Nginx /inject/ → manual-injector → MQTT
+   → ingestion (valide) → TimescaleDB → quality-engine (recalcule)
+```
+
+`manual-injector` est le **2ᵉ composant à cheval** sur `iot-net` + `backend-net`
+(après l'ingestion). Affordance de démo — à restreindre/retirer en production.
+
+**Deux modes :**
+- **Point unique** : une mesure → déclenche les alertes instantanées (temp /
+  lux / humidité). Impact négligeable sur le score cumulé.
+- **Scénario soutenu** : rafale de points **horodatés dans le passé** sur une
+  durée simulée → l'intégration trapézoïdale voit une exposition prolongée →
+  le score bouge réellement. Presets : canicule 2h, exposition lumière, humidité.
+
+*Validé end-to-end (2026-06-07)* : scénario canicule (38°C, 2h) → score
+cons-001 92.7 → 45.3 (`quality_critical`), 24 lignes via ingestion.
+
 ### Feature-based architecture React
 
 ```
@@ -230,6 +259,7 @@ src/
                     # ConsignmentDetailPage, TelemetryChart, QualityChart,
                     # TimeWindowSelector
     alerts/         # api, hooks, AlertsTable
+    inject/         # api, InjectPage
 ```
 
 ### Dashboard — accès

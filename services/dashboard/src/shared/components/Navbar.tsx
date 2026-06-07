@@ -17,6 +17,9 @@ export default function Navbar() {
         Olive Oil Monitor
       </Link>
       <span className="text-slate-500 text-sm">Surveillance qualité huile d'olive</span>
+      <Link to="/inject" className="text-slate-400 hover:text-slate-200 text-sm">
+        Injection
+      </Link>
       <div className="ml-auto flex items-center gap-4">
         <div className="flex items-center gap-2 text-xs">
           <span

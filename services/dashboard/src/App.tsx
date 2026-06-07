@@ -4,6 +4,7 @@ import Navbar from './shared/components/Navbar'
 import LoginPage from './features/auth/LoginPage'
 import ConsignmentsPage from './features/consignments/ConsignmentsPage'
 import ConsignmentDetailPage from './features/consignments/ConsignmentDetailPage'
+import InjectPage from './features/inject/InjectPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!getToken()) return <Navigate to="/login" replace />
@@ -24,6 +25,7 @@ export default function App() {
                 <Routes>
                   <Route path="/" element={<ConsignmentsPage />} />
                   <Route path="/consignments/:id" element={<ConsignmentDetailPage />} />
+                  <Route path="/inject" element={<InjectPage />} />
                 </Routes>
               </div>
             </ProtectedRoute>
