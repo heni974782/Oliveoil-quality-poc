@@ -65,21 +65,43 @@ services:
       - backend-net
 
   # --- Phase 3 : moteur de qualité ---
-  # quality-engine:
-  #   build: ./services/quality-engine
-  #   container_name: oliveoil-quality-engine
-  #   env_file: .env
-  #   depends_on: [timescaledb]
-  #   networks: [backend-net]
+  quality-engine:
+    build: ./services/quality-engine
+    container_name: oliveoil-quality-engine
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      - timescaledb
+    networks:
+      - backend-net
 
-  # --- Phase 4 : API ---
-  # api:
-  #   build: ./services/api
-  #   container_name: oliveoil-api
-  #   env_file: .env
-  #   depends_on: [timescaledb]
-  #   ports: ["8000:8000"]
-  #   networks: [backend-net]
+  # --- Phase 4 : API FastAPI ---
+  api:
+    build: ./services/api
+    container_name: oliveoil-api
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      - timescaledb
+    ports:
+      - "8000:8000"     # exposé pour tests Postman directs
+    networks:
+      - backend-net
+
+  # --- Phase 4 : Dashboard React (Nginx + proxy vers api) ---
+  dashboard:
+    build:
+      context: ./services/dashboard
+      args:
+        VITE_API_TOKEN: ${API_AUTH_TOKEN}
+    container_name: oliveoil-dashboard
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    networks:
+      - backend-net
 
 networks:
   iot-net:

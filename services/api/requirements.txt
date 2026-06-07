@@ -1,5 +1,4 @@
-# Dépendances de l'API. Épingler les versions en Phase 4.
-fastapi
-uvicorn[standard]
-pydantic
-psycopg[binary]
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+psycopg[binary]==3.2.6
+psycopg-pool==3.2.3

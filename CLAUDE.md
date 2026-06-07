@@ -114,3 +114,6 @@ Vérifier la « définition de terminé » avant d'avancer. Détail dans
 | 2026-05-25 | Simulation logicielle ; pas d'ESP32 pour le moment. |
 | 2026-05-25 | Moteur de qualité par règles (exposition cumulée), pas de ML. |
 | 2026-05-25 | Code/commentaires en anglais, documentation humaine en français. |
+| 2026-06-03 | Phase 3 livrée : intégration trapézoïdale, score [0-100], cooldown alertes 1h. `alerts` table standard (pas hypertable) — PK BIGSERIAL incompatible TimescaleDB. |
+| 2026-06-03 | Phase 4 livrée : FastAPI + React feature-based (pas MVC — non idiomatique React). Nginx reverse proxy `/api/*` → FastAPI. Token baked dans bundle React via build arg Docker. |
+| 2026-06-03 | Phase 5 livrée : ACL MQTT activée (moindre privilège), revue sécurité complète dans `docs/security-review.md`. POC complet — toutes phases terminées. |

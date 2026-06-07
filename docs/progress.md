@@ -115,10 +115,138 @@ Chaque service a son `Dockerfile`, `requirements.txt` et `src/main.py` avec TODO
 
 ---
 
-## Phases suivantes
+---
 
-| Phase | Objectif | Critère de fin |
-|-------|----------|----------------|
-| Phase 3 | Moteur de qualité + alertes | Indice et alertes calculés et stockés |
-| Phase 4 | API + dashboard React | Dashboard montre les consignations en temps réel |
-| Phase 5 | Durcissement sécurité + doc finale | Revue secure-by-design, documentation livrée |
+## Phase 3 — Moteur de qualité + alertes ✅ Terminée
+
+### Ce qui est fait
+
+| Tâche | Statut |
+|-------|--------|
+| `db/init/01_schema.sql` — tables `quality_index` (hypertable) + `alerts` (indexes) | ✅ |
+| Schéma appliqué sur la base courante | ✅ |
+| `services/quality-engine/src/main.py` — moteur complet | ✅ |
+| `services/quality-engine/requirements.txt` — `psycopg[binary]==3.2.6` épinglé | ✅ |
+| `docker-compose.yml` — service `quality-engine` décommenté | ✅ |
+| `.env.example` — variables du moteur documentées | ✅ |
+| Service buildé et lancé | ✅ |
+| Indice et alertes calculés et stockés (vérifiés via `SELECT`) | ✅ |
+
+### Logique du moteur
+
+- **Cycle** : toutes les `QUALITY_RUN_INTERVAL` secondes (défaut : 30 s).
+- **Exposition cumulée** : intégration trapézoïdale sur toute l'historique de télémétrie — exposition thermique (degré-heures au-dessus de `QUALITY_TEMP_BASELINE` = 18 °C) et lumineuse (lux-heures au-dessus de `QUALITY_LIGHT_BASELINE` = 50 lux).
+- **Indice de qualité** : `score = 100 − (degree_hours × 2.0) − (lux_hours × 0.1)`, clampé [0, 100].
+- **Alertes** avec cooldown 1 h (pas de doublon) :
+  - `quality_warning` — score < 70
+  - `quality_critical` — score < 50
+  - `high_temperature` — dernière mesure > 30 °C
+  - `high_light` — dernière mesure > 5 000 lux
+  - `high_humidity` — dernière mesure > 70 %
+
+### Résultats au premier cycle (2026-06-03)
+
+| Consignation | Score | Degré-heures | Lux-heures | Alerte |
+|---|---|---|---|---|
+| cons-001 | 66.8 | 0.256 | 326.8 | quality_warning |
+| cons-002 | 54.6 | 1.106 | 431.8 | quality_warning |
+
+---
+
+---
+
+## Phase 4 — API + Dashboard ✅ Terminée
+
+### Ce qui est fait
+
+| Tâche | Statut |
+|-------|--------|
+| `services/api/` — FastAPI complet (auth, pool DB, routes REST + WebSocket) | ✅ |
+| `services/dashboard/` — React + Vite + Tailwind (feature-based architecture) | ✅ |
+| `services/dashboard/nginx.conf` — reverse proxy `/api/*` → FastAPI, SPA fallback | ✅ |
+| `docker-compose.yml` — services `api` (port 8000) + `dashboard` (port 3000) actifs | ✅ |
+| API health + `/consignments/` retournent 200 | ✅ |
+| Dashboard servi via Nginx + proxy `/api/` fonctionnel | ✅ |
+
+### Architecture déployée
+
+```
+Browser :3000 → Nginx → /api/* → FastAPI :8000 → TimescaleDB
+                       → /*     → React SPA (dist/)
+```
+
+### Endpoints API
+
+| Méthode | Chemin | Auth | Description |
+|---------|--------|------|-------------|
+| GET | `/health` | Non | Health check |
+| GET | `/consignments/` | Bearer | Liste + résumé (score, métriques, alertes 24h) |
+| GET | `/consignments/{id}/telemetry` | Bearer | Historique télémétrie (ASC, limit=200) |
+| GET | `/consignments/{id}/quality` | Bearer | Historique scores qualité (ASC, limit=200) |
+| GET | `/alerts/` | Bearer | Alertes récentes (filtre consignment_id, limit=50) |
+| WS | `/ws/live?token=` | Query param | Push toutes les 10 s |
+
+### Feature-based architecture React
+
+```
+src/
+  shared/           # types, apiClient, useLiveData, Navbar, StatusBadge
+  features/
+    consignments/   # api, hooks, ConsignmentsPage, ConsignmentCard,
+                    # ConsignmentDetailPage, TelemetryChart, QualityChart
+    alerts/         # api, hooks, AlertsTable
+```
+
+### Dashboard — accès
+
+| URL | Description |
+|-----|-------------|
+| http://localhost:3000 | Page principale — cards par consignation (live via WS) |
+| http://localhost:3000/consignments/{id} | Détail — charts télémétrie + score + alertes |
+| http://localhost:8000/docs | OpenAPI auto-générée (FastAPI) |
+
+---
+
+---
+
+## Phase 5 — Durcissement sécurité + documentation ✅ Terminée
+
+### Ce qui est fait
+
+| Tâche | Statut |
+|-------|--------|
+| ACL MQTT activée — `simulator` write only, `ingestion` read only | ✅ |
+| Pipeline validé après activation ACL | ✅ |
+| Revue secure-by-design complète — `docs/security-review.md` | ✅ |
+| Audit secrets Git — `.gitignore` vérifié | ✅ |
+| Actions prod documentées (TLS, CORS, rotation tokens) | ✅ |
+
+### Résultat de la revue
+
+- **7 items OK** : ACL, auth MQTT, Pydantic, segmentation réseau, secrets Git, Bearer token API, WS auth
+- **7 items MITIGÉS** (acceptables POC, documentés pour prod) : TLS, CORS, rate limiting, token React baked, port 8000 exposé
+- **2 items ACTION** (obligatoires avant tout déploiement réel) : rotation `API_AUTH_TOKEN` et passwords MQTT
+
+Voir `docs/security-review.md` pour le détail complet.
+
+---
+
+## Fixes post-livraison
+
+| Date | Fix | Cause | Action |
+|------|-----|-------|--------|
+| 2026-06-07 | `API_AUTH_TOKEN` roté | Token `change_me` en production | Nouveau token 64 hex chars dans `.env`, rebuild dashboard |
+| 2026-06-07 | Auth DB TimescaleDB (`oliveoil_app`) | `POSTGRES_PASSWORD` dans `.env` divergeait du volume initialisé | `ALTER USER oliveoil_app PASSWORD '...'` dans le container |
+
+---
+
+## POC complet — toutes phases livrées
+
+| Phase | Statut |
+|-------|--------|
+| Phase 0 — Scaffolding | ✅ |
+| Phase 1 — Simulateur | ✅ |
+| Phase 2 — Ingestion + persistance | ✅ |
+| Phase 3 — Moteur de qualité + alertes | ✅ |
+| Phase 4 — API + Dashboard | ✅ |
+| Phase 5 — Durcissement sécurité + doc | ✅ |

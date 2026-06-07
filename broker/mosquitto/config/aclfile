@@ -1,0 +1,17 @@
+# ACL Mosquitto — POC monitoring huile d'olive.
+#
+# Principe du moindre privilège : chaque user ne peut accéder qu'aux topics
+# strictement nécessaires à son rôle.
+#
+# Topology des topics :
+#   oliveoil/<site_id>/<consignment_id>/telemetry
+#
+# Règles : "read" = subscribe, "write" = publish, "readwrite" = les deux.
+
+# Le simulateur publie uniquement — il ne doit jamais s'abonner.
+user simulator
+topic write oliveoil/#
+
+# L'ingestion s'abonne uniquement — elle ne publie pas sur le broker MQTT.
+user ingestion
+topic read oliveoil/#
