@@ -47,6 +47,11 @@ HUMIDITY_ALERT = float(os.getenv("QUALITY_HUMIDITY_ALERT", "70.0"))
 # Re-raise same alert only after this cooldown (seconds)
 ALERT_COOLDOWN_S = int(os.getenv("QUALITY_ALERT_COOLDOWN", "3600"))
 
+# Rolling window: only telemetry within the last N days is used for exposure
+# computation. 0 = unlimited (full history). Default 1 day — realistic for
+# transport monitoring (evaluate recent conditions, not lifetime history).
+QUALITY_WINDOW_DAYS = int(os.getenv("QUALITY_WINDOW_DAYS", "1"))
+
 RUN_INTERVAL_S = int(os.getenv("QUALITY_RUN_INTERVAL", "30"))
 
 DB_RETRY_COUNT = 15
@@ -92,17 +97,32 @@ def get_consignment_ids(conn: psycopg.Connection) -> list[str]:
 
 
 def get_telemetry(conn: psycopg.Connection, consignment_id: str) -> list[dict]:
-    """All telemetry rows for a consignment, sorted ascending by time."""
-    with conn.cursor() as cur:
-        cur.execute(
-            """
+    """Telemetry rows for a consignment within the rolling window, sorted ASC.
+
+    If QUALITY_WINDOW_DAYS > 0, only rows within the last N days are returned.
+    QUALITY_WINDOW_DAYS = 0 means full history (original behaviour).
+    """
+    if QUALITY_WINDOW_DAYS > 0:
+        since = datetime.now(timezone.utc) - timedelta(days=QUALITY_WINDOW_DAYS)
+        query = """
+            SELECT time, temperature_c, light_lux, humidity_pct
+            FROM telemetry
+            WHERE consignment_id = %s
+              AND time >= %s
+            ORDER BY time ASC;
+        """
+        params = (consignment_id, since)
+    else:
+        query = """
             SELECT time, temperature_c, light_lux, humidity_pct
             FROM telemetry
             WHERE consignment_id = %s
             ORDER BY time ASC;
-            """,
-            (consignment_id,),
-        )
+        """
+        params = (consignment_id,)
+
+    with conn.cursor() as cur:
+        cur.execute(query, params)
         return [
             {
                 "time":          row[0],

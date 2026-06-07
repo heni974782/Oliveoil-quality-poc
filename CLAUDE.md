@@ -117,3 +117,5 @@ Vérifier la « définition de terminé » avant d'avancer. Détail dans
 | 2026-06-03 | Phase 3 livrée : intégration trapézoïdale, score [0-100], cooldown alertes 1h. `alerts` table standard (pas hypertable) — PK BIGSERIAL incompatible TimescaleDB. |
 | 2026-06-03 | Phase 4 livrée : FastAPI + React feature-based (pas MVC — non idiomatique React). Nginx reverse proxy `/api/*` → FastAPI. Token baked dans bundle React via build arg Docker. |
 | 2026-06-03 | Phase 5 livrée : ACL MQTT activée (moindre privilège), revue sécurité complète dans `docs/security-review.md`. POC complet — toutes phases terminées. |
+| 2026-06-07 | Fenêtre glissante `QUALITY_WINDOW_DAYS=1` (défaut) : moteur calcule sur les dernières 24h au lieu de l'historique complet. Évite le score figé à 0 sur démo longue durée. |
+| 2026-06-07 | Recalibration poids lumineux `QUALITY_LIGHT_WEIGHT=0.005` (était 0.1) : un incident `sun_exposure` ne détruit plus le score instantanément. Probabilité incidents simulateur réduite à 0.5%. |
