@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useConsignments } from '../consignments/hooks'
+import { useLiveData } from '../../shared/useLiveData'
+import StatusBadge from '../../shared/components/StatusBadge'
 import { injectPoint, injectScenario } from './api'
 import type { ScenarioPayload } from './api'
 
@@ -35,8 +37,19 @@ const inputClass =
 
 const labelClass = 'text-xs font-medium text-slate-400 uppercase tracking-wider mb-1 block'
 
+function scoreColor(s: number | null) {
+  if (s === null) return 'text-slate-400'
+  if (s >= 70) return 'text-emerald-400'
+  if (s >= 50) return 'text-amber-400'
+  return 'text-red-400'
+}
+
+const fmtMetric = (v: number | null, unit: string, digits = 1) =>
+  v === null ? '—' : `${v.toFixed(digits)} ${unit}`
+
 export default function InjectPage() {
   const { data: consignments } = useConsignments()
+  const { data: live, connected } = useLiveData()
   const ids = consignments?.map((c) => c.consignment_id) ?? []
 
   const [cid, setCid] = useState('')
@@ -48,6 +61,12 @@ export default function InjectPage() {
 
   // Default consignment once list loads
   const activeCid = cid || ids[0] || ''
+
+  // Live state of the targeted consignment, pushed every 10s over WebSocket.
+  const liveCons = live?.consignments.find((c) => c.consignment_id === activeCid) ?? null
+  const liveAlerts = (live?.recent_alerts ?? [])
+    .filter((a) => a.consignment_id === activeCid)
+    .slice(0, 5)
 
   async function handlePoint(e: React.FormEvent) {
     e.preventDefault()
@@ -123,6 +142,73 @@ export default function InjectPage() {
           {status.msg}
         </div>
       )}
+
+      {/* Live state of the targeted consignment — updates after injection */}
+      <section className="bg-slate-800 border border-slate-700 rounded-xl p-5">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-slate-300 font-semibold text-sm uppercase tracking-wide">
+            État en direct — {activeCid || '—'}
+          </h2>
+          <div className="flex items-center gap-2 text-xs">
+            <span className={`w-2 h-2 rounded-full ${connected ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+            <span className={connected ? 'text-emerald-400' : 'text-slate-500'}>
+              {connected ? 'LIVE' : 'RECONNEXION...'}
+            </span>
+          </div>
+        </div>
+
+        {liveCons ? (
+          <>
+            <div className="flex items-baseline gap-6 mb-4">
+              <div>
+                <span className="text-xs text-slate-500 block">Score</span>
+                <span className={`text-4xl font-bold ${scoreColor(liveCons.quality_score)}`}>
+                  {liveCons.quality_score !== null ? liveCons.quality_score.toFixed(1) : '—'}
+                  <span className="text-slate-500 text-base ml-1">/100</span>
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-x-6 gap-y-1 text-sm">
+                <div>
+                  <span className="text-xs text-slate-500 block">Température</span>
+                  <span className="text-orange-300 font-medium">{fmtMetric(liveCons.temperature_c, '°C')}</span>
+                </div>
+                <div>
+                  <span className="text-xs text-slate-500 block">Lumière</span>
+                  <span className="text-yellow-300 font-medium">{fmtMetric(liveCons.light_lux, 'lux', 0)}</span>
+                </div>
+                <div>
+                  <span className="text-xs text-slate-500 block">Humidité</span>
+                  <span className="text-blue-300 font-medium">{fmtMetric(liveCons.humidity_pct, '%')}</span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <span className="text-xs text-slate-500 uppercase tracking-wide">Alertes récentes</span>
+              {liveAlerts.length === 0 ? (
+                <p className="text-slate-600 text-xs mt-1">Aucune.</p>
+              ) : (
+                <ul className="mt-2 space-y-1">
+                  {liveAlerts.map((a) => (
+                    <li key={a.id} className="flex items-center gap-2 text-xs">
+                      <StatusBadge severity={a.severity} />
+                      <span className="text-slate-400 font-mono">{a.alert_type}</span>
+                      <span className="text-slate-500 truncate">{a.message}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <p className="text-slate-600 text-xs mt-4">
+              Push WebSocket toutes les 10 s. Après injection, le score se recalcule au prochain
+              cycle moteur (≤ 30 s) puis remonte ici automatiquement.
+            </p>
+          </>
+        ) : (
+          <p className="text-slate-500 text-sm">En attente de données live...</p>
+        )}
+      </section>
 
       {/* Single point */}
       <section className="bg-slate-800 border border-slate-700 rounded-xl p-5">
