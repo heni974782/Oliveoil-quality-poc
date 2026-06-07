@@ -92,8 +92,6 @@ services:
   dashboard:
     build:
       context: ./services/dashboard
-      args:
-        VITE_API_TOKEN: ${API_AUTH_TOKEN}
     container_name: oliveoil-dashboard
     restart: unless-stopped
     ports:

@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { WS_TOKEN } from './apiClient'
+import { getToken } from './auth'
 import type { LivePayload } from './types'
 
-// WebSocket URL: same host, /api/ws/live (proxied by Nginx / Vite dev server)
 function buildWsUrl(): string {
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
   const host = window.location.host
-  return `${proto}://${host}/api/ws/live?token=${encodeURIComponent(WS_TOKEN)}`
+  return `${proto}://${host}/api/ws/live?token=${encodeURIComponent(getToken())}`
 }
 
 export interface LiveDataState {
@@ -47,7 +46,6 @@ export function useLiveData(): LiveDataState {
       ws.onclose = () => {
         if (!unmounted) {
           setState((s) => ({ ...s, connected: false }))
-          // Reconnect after 5 s
           retryRef.current = setTimeout(connect, 5_000)
         }
       }

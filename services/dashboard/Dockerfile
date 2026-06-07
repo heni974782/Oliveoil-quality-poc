@@ -8,11 +8,6 @@ RUN npm install
 
 COPY . .
 
-# Token injected at build time via docker-compose build arg.
-# Baked into the JS bundle — acceptable for a POC internal dashboard.
-ARG VITE_API_TOKEN
-ENV VITE_API_TOKEN=${VITE_API_TOKEN}
-
 RUN npm run build
 
 # Stage 2 — serve with Nginx
