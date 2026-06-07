@@ -59,10 +59,14 @@ async def get_telemetry(
         await cur.execute(
             """
             SELECT time, temperature_c, light_lux, humidity_pct, event
-            FROM telemetry
-            WHERE consignment_id = %s
-            ORDER BY time ASC
-            LIMIT %s;
+            FROM (
+                SELECT time, temperature_c, light_lux, humidity_pct, event
+                FROM telemetry
+                WHERE consignment_id = %s
+                ORDER BY time DESC
+                LIMIT %s
+            ) sub
+            ORDER BY time ASC;
             """,
             (consignment_id, limit),
         )
@@ -82,10 +86,14 @@ async def get_quality(
         await cur.execute(
             """
             SELECT time, quality_score, degree_hours, lux_hours
-            FROM quality_index
-            WHERE consignment_id = %s
-            ORDER BY time ASC
-            LIMIT %s;
+            FROM (
+                SELECT time, quality_score, degree_hours, lux_hours
+                FROM quality_index
+                WHERE consignment_id = %s
+                ORDER BY time DESC
+                LIMIT %s
+            ) sub
+            ORDER BY time ASC;
             """,
             (consignment_id, limit),
         )
