@@ -137,6 +137,18 @@ Chaque service a son `Dockerfile`, `requirements.txt` et `src/main.py` avec TODO
 - **Cycle** : toutes les `QUALITY_RUN_INTERVAL` secondes (défaut : 30 s).
 - **Exposition cumulée** : intégration trapézoïdale sur toute l'historique de télémétrie — exposition thermique (degré-heures au-dessus de `QUALITY_TEMP_BASELINE` = 18 °C) et lumineuse (lux-heures au-dessus de `QUALITY_LIGHT_BASELINE` = 50 lux).
 - **Indice de qualité** : `score = 100 − (degree_hours × 2.0) − (lux_hours × 0.1)`, clampé [0, 100].
+
+**Interprétation du score :**
+
+| Score | Signification | Couleur dashboard |
+|-------|---------------|-------------------|
+| ≥ 70 | Qualité acceptable | Vert |
+| 50 – 70 | Dégradation notable | Ambre |
+| < 50 | Critique | Rouge |
+| 0 | Exposition cumulée trop élevée — huile déclassée | Rouge (plancher) |
+
+> Un score de 0 indique que l'exposition thermique et/ou lumineuse cumulée a dépassé le seuil de déclassement du modèle. La valeur reste à 0 même si les conditions redeviennent favorables — l'exposition est irréversible.
+
 - **Alertes** avec cooldown 1 h (pas de doublon) :
   - `quality_warning` — score < 70
   - `quality_critical` — score < 50
