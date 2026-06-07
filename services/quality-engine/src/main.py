@@ -210,37 +210,50 @@ def check_and_raise_alerts(
     conn: psycopg.Connection,
     consignment_id: str,
     score: float,
+    degree_hours: float,
+    lux_hours: float,
     latest: dict,
 ) -> None:
     """Evaluate all alert conditions; persist new ones that aren't in cooldown."""
+    temp_penalty  = degree_hours * TEMP_WEIGHT
+    light_penalty = lux_hours * LIGHT_WEIGHT
+
     checks = [
         (
             "quality_critical", "critical", score, CRITICAL_SCORE,
             score < CRITICAL_SCORE,
-            f"Quality score {score:.1f} below critical threshold {CRITICAL_SCORE}",
+            (
+                f"Score {score:.1f}/100 — critique. "
+                f"Thermique: {degree_hours:.2f}°·h (−{temp_penalty:.1f} pts), "
+                f"lumière: {lux_hours:.1f} lx·h (−{light_penalty:.1f} pts)."
+            ),
         ),
         (
             "quality_warning", "warning", score, WARNING_SCORE,
             CRITICAL_SCORE <= score < WARNING_SCORE,
-            f"Quality score {score:.1f} below warning threshold {WARNING_SCORE}",
+            (
+                f"Score {score:.1f}/100 — dégradation. "
+                f"Thermique: {degree_hours:.2f}°·h (−{temp_penalty:.1f} pts), "
+                f"lumière: {lux_hours:.1f} lx·h (−{light_penalty:.1f} pts)."
+            ),
         ),
         (
             "high_temperature", "warning",
             latest["temperature_c"], TEMP_ALERT_C,
             latest["temperature_c"] > TEMP_ALERT_C,
-            f"Temperature {latest['temperature_c']:.1f}°C exceeds {TEMP_ALERT_C}°C",
+            f"Température instantanée {latest['temperature_c']:.1f}°C — seuil {TEMP_ALERT_C}°C dépassé.",
         ),
         (
             "high_light", "warning",
             latest["light_lux"], LIGHT_ALERT_LX,
             latest["light_lux"] > LIGHT_ALERT_LX,
-            f"Light {latest['light_lux']:.0f} lux exceeds {LIGHT_ALERT_LX} lux",
+            f"Luminosité instantanée {latest['light_lux']:.0f} lux — seuil {LIGHT_ALERT_LX:.0f} lux dépassé.",
         ),
         (
             "high_humidity", "warning",
             latest["humidity_pct"], HUMIDITY_ALERT,
             latest["humidity_pct"] > HUMIDITY_ALERT,
-            f"Humidity {latest['humidity_pct']:.1f}% exceeds {HUMIDITY_ALERT}%",
+            f"Humidité instantanée {latest['humidity_pct']:.1f}% — seuil {HUMIDITY_ALERT:.0f}% dépassé.",
         ),
     ]
 
@@ -269,7 +282,7 @@ def run_once(conn: psycopg.Connection) -> None:
         score = compute_quality_score(degree_hours, lux_hours)
 
         insert_quality_index(conn, cid, score, degree_hours, lux_hours)
-        check_and_raise_alerts(conn, cid, score, rows[-1])
+        check_and_raise_alerts(conn, cid, score, degree_hours, lux_hours, rows[-1])
 
         log.info(
             "Consignment %s: score=%.1f | deg-h=%.4f | lux-h=%.4f",
