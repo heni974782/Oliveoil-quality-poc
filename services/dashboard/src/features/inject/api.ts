@@ -13,9 +13,9 @@ export interface ScenarioPayload extends PointPayload {
   points: number
 }
 
-// Injection endpoints are proxied by Nginx at /inject/* → manual-injector.
+// Injection endpoints are proxied by Nginx at /injector/* → manual-injector.
 async function postInject<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`/inject${path}`, {
+  const res = await fetch(`/injector${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

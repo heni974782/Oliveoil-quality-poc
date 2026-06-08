@@ -1,7 +1,12 @@
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useConsignments } from '../consignments/hooks'
+import { fetchTelemetry, fetchQuality } from '../consignments/api'
 import { useLiveData } from '../../shared/useLiveData'
 import StatusBadge from '../../shared/components/StatusBadge'
+import TimeWindowSelector from '../consignments/TimeWindowSelector'
+import QualityChart from '../consignments/QualityChart'
+import TelemetryChart from '../consignments/TelemetryChart'
 import { injectPoint, injectScenario } from './api'
 import type { ScenarioPayload } from './api'
 
@@ -58,9 +63,24 @@ export default function InjectPage() {
   const [hum, setHum] = useState('75')
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
   const [busy, setBusy] = useState(false)
+  const [chartHours, setChartHours] = useState(1)
 
   // Default consignment once list loads
   const activeCid = cid || ids[0] || ''
+
+  // Charts: poll every 30s so injection effect appears without page reload.
+  const { data: telemetryData = [] } = useQuery({
+    queryKey: ['telemetry', activeCid, chartHours],
+    queryFn: () => fetchTelemetry(activeCid, chartHours),
+    enabled: !!activeCid,
+    refetchInterval: 30_000,
+  })
+  const { data: qualityData = [] } = useQuery({
+    queryKey: ['quality', activeCid, chartHours],
+    queryFn: () => fetchQuality(activeCid, chartHours),
+    enabled: !!activeCid,
+    refetchInterval: 30_000,
+  })
 
   // Live state of the targeted consignment, pushed every 10s over WebSocket.
   const liveCons = live?.consignments.find((c) => c.consignment_id === activeCid) ?? null
@@ -208,6 +228,36 @@ export default function InjectPage() {
         ) : (
           <p className="text-slate-500 text-sm">En attente de données live...</p>
         )}
+      </section>
+
+      {/* Charts — quality score + telemetry, auto-refresh 30s */}
+      <section className="bg-slate-800 border border-slate-700 rounded-xl p-5 space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-slate-300 font-semibold text-sm uppercase tracking-wide">
+            Évolution — {activeCid || '—'}
+          </h2>
+          <TimeWindowSelector value={chartHours} onChange={setChartHours} />
+        </div>
+
+        <div>
+          <p className="text-xs font-medium text-slate-400 mb-2 ml-1">
+            Score qualité <span className="text-slate-500">(/ 100)</span>
+          </p>
+          {qualityData.length > 0 ? (
+            <QualityChart data={qualityData} />
+          ) : (
+            <p className="text-slate-600 text-xs py-8 text-center">Aucune donnée sur cette fenêtre.</p>
+          )}
+        </div>
+
+        <div>
+          <p className="text-xs font-medium text-slate-400 mb-2 ml-1">Télémétrie</p>
+          {telemetryData.length > 0 ? (
+            <TelemetryChart data={telemetryData} />
+          ) : (
+            <p className="text-slate-600 text-xs py-4 text-center">Aucune donnée sur cette fenêtre.</p>
+          )}
+        </div>
       </section>
 
       {/* Single point */}
