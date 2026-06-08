@@ -18,6 +18,8 @@ from datetime import datetime, timedelta, timezone
 
 import psycopg
 
+from . import notifier
+
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
@@ -280,6 +282,7 @@ def check_and_raise_alerts(
     for alert_type, severity, value, threshold, condition, message in checks:
         if condition and not already_alerted(conn, consignment_id, alert_type):
             insert_alert(conn, consignment_id, alert_type, severity, value, threshold, message)
+            notifier.notify(alert_type, severity, consignment_id, value, threshold, message)
 
 
 # ---------------------------------------------------------------------------

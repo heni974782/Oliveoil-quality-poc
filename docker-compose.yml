@@ -71,6 +71,10 @@ services:
     container_name: oliveoil-quality-engine
     restart: unless-stopped
     env_file: .env
+    environment:
+      NOTIFICATION_WEBHOOK_URL: ${NOTIFICATION_WEBHOOK_URL:-}
+      NOTIFICATION_WEBHOOK_FORMAT: ${NOTIFICATION_WEBHOOK_FORMAT:-generic}
+      NOTIFICATION_ALERT_TYPES: ${NOTIFICATION_ALERT_TYPES:-high_temperature,high_light,high_humidity}
     depends_on:
       - timescaledb
     networks:
